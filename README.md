@@ -1,69 +1,132 @@
-# Serverless Currency Converter
+# 💱 Serverless Currency Converter
 
-Aplicación serverless que expone tres funciones Lambda (conversión puntual, consulta de tasas y obtención de historial) y una interfaz web ligera para interactuar con ellas.
+Aplicación web basada en **arquitectura Serverless (FaaS)**, que permite:
 
-## Arquitectura
+- 🔁 Convertir divisas entre USD, EUR y COP
+- 📊 Consultar tasas de cambio desde una API externa
+- 📚 Obtener un historial de conversiones simulado
 
-- **Backend (AWS Lambda + API Gateway + DynamoDB)**
-  - `POST /convert` (`convert_currency/handler.convert_currency`)
-    - Valida entrada, consulta tasas en `https://open.er-api.com/v6/latest/{base}` y calcula la conversión.
-    - Intenta persistir el resultado en la tabla DynamoDB `aws-currency-converter-history`.
-  - `GET /rates` (`get_exchange_rates/handler.get_exchange_rates`)
-    - Devuelve el mapa de tasas para la moneda base solicitada y metadatos de la fuente.
-  - `GET /history` (`get_history/handler.get_history`)
-    - Lee el historial desde DynamoDB (ordenado por fecha desc). Si no hay datos o no hay permisos, responde con un historial de ejemplo.
-  - `shared/exchange.py` encapsula la comunicación con el proveedor de tasas y normaliza errores.
-  - `shared/storage.py` gestiona la integración opcional con DynamoDB sin requerir variables de entorno ni intervención manual.
-- **Frontend (carpeta `frontend/`)**
-  - `index.html` contiene la maquetación y define el atributo `data-api-base` con la URL del API Gateway.
-  - `script.js` consume los tres endpoints, renderiza los resultados y señala si el historial proviene de DynamoDB o de los datos mock.
-  - `style.css` brinda el estilo responsivo.
+El proyecto usa **AWS Lambda**, **API Gateway** y **Serverless Framework**, con una SPA en HTML, CSS y JS.
 
-## Requisitos previos
+---
 
-- Node.js 18+ y npm (para Serverless Framework y servir el frontend).
-- Python 3.12 y `pip` (las Lambdas usan `requests`).
-- AWS CLI configurado con credenciales con permisos para Lambda, API Gateway y DynamoDB.
-- Serverless Framework (`npm install -g serverless`).
+## 🌐 Endpoints públicos
 
-## Despliegue del backend
+Desplegados en AWS:
 
-```bash
+| Función             | Método | Endpoint                                                                 |
+|---------------------|--------|--------------------------------------------------------------------------|
+| `convertCurrency`   | POST   | [https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/convert](https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/convert) |
+| `getExchangeRates`  | GET    | [https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/rates](https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/rates)     |
+| `getHistory`        | GET    | [https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/history](https://k5uwumi7m2.execute-api.us-east-1.amazonaws.com/dev/history)   |
+
+---
+
+## 🧱 Arquitectura
+
+```plaintext
+[Frontend SPA] (HTML + JS)
+        ↓
+   API Gateway (AWS)
+        ↓
++---------------------------+
+|   Funciones Lambda (FaaS) |
+|---------------------------|
+| convertCurrency           | --> llama a ExchangeRate-API
+| getExchangeRates          | --> retorna todas las tasas
+| getHistory                | --> retorna historial simulado
++---------------------------+
+        ↓
+   Módulo compartido `shared/` para lógica común
+```
+
+## 📂 Estructura del proyecto
+```plaintext
+serverless-currency-converter/
+├── backend/
+│   ├── convert_currency/
+│   │   ├── handler.py
+│   │   ├── requirements.txt
+│   ├── get_exchange_rates/
+│   │   ├── handler.py
+│   │   ├── requirements.txt
+│   ├── get_history/
+│   │   ├── handler.py
+│   │   ├── requirements.txt
+│   ├── shared/
+│   │   ├── __init__.py
+│   │   ├── exchange.py       
+│   │   ├── storage.py          
+│   │   ├── requirements.txt
+│   └── serverless.yml
+├── frontend/
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+├── README.md
+
+```
+
+## 🚀 Despliegue con Serverless Framework
+### Requisitos:
++ Node.js + NPM
++ Python 3.11
++ AWS CLI (aws configure)
++ Serverless Framework (npm i -g serverless)
+
+### Deploy:
+```sh
 cd backend
-npm install       # si todavía no existen node_modules para serverless plugins
-sls deploy
+serverless deploy
 ```
 
-El manifiesto `serverless.yml` crea automáticamente la tabla DynamoDB `aws-currency-converter-history` en la región `us-east-1` y asigna a las Lambdas los permisos mínimos necesarios (`DescribeTable`, `PutItem`, `Query`).
+## 📚 Funciones Lambda
+convertCurrency (POST /convert)
 
-### Pruebas locales
+Convierte una cantidad de una divisa a otra usando tasas reales.
 
-Ejecuta invocaciones locales con Serverless (requieren conexión a Internet para acceder al proveedor de tasas):
-
-```bash
-sls invoke local -f convertCurrency --data '{"body":"{\"from\":\"USD\",\"to\":\"EUR\",\"amount\":100}"}'
-sls invoke local -f getExchangeRates --data '{"queryStringParameters":{"base":"USD"}}'
-sls invoke local -f getHistory
+Payload:
+```json
+{ "from": "USD", "to": "EUR", "amount": 100 }
 ```
 
-Si no hay acceso a Internet, puedes emular la respuesta del proveedor usando `unittest.mock` (ver `shared/exchange.py` para el formato esperado de los datos).
+Respuesta:
+```json
+{ "result": 93.1, "rate": 0.931 }
+```
 
-## Frontend
+getExchangeRates (GET /rates)
 
-1. Ajusta el atributo `data-api-base` en `frontend/index.html` si tu API Gateway tiene otra URL o stage.
-2. Sirve la carpeta `frontend` con tu herramienta preferida, por ejemplo:
+Retorna todas las tasas de cambio desde una divisa base.
 
-   ```bash
-   cd frontend
-   npx serve .
-   ```
+Respuesta parcial:
+```json
+{
+  "base": "USD",
+  "rates": {
+    "EUR": 0.931,
+    "COP": 3950.42,
+    ...
+  }
+}
+```
 
-3. Abre el navegador en la URL indicada por el comando (por defecto `http://localhost:3000`).
+getHistory (GET /history)
 
-El frontend carga automáticamente las tasas e historial al iniciar y permite realizar conversiones desde la tarjeta principal.
+Historial de conversiones simulado desde el módulo shared/storage.py.
 
-## Observaciones
-
-- Si DynamoDB no está accesible (credenciales ausentes o permisos insuficientes), la aplicación continúa funcionando y `GET /history` regresará el historial de ejemplo indicando `source: "mock"`.
-- Cambiar el proveedor de tasas sólo requiere actualizar las variables `EXCHANGE_API_BASE` y `EXCHANGE_API_TIMEOUT` en `serverless.yml`.
-- Para entornos distintos de `us-east-1`, actualiza la región en `serverless.yml` y, si lo deseas, el nombre de la tabla en `shared/storage.py` y en la sección `resources`.
+Respuesta:
+```json
+{
+  "success": true,
+  "history": [
+    {
+      "from": "USD",
+      "to": "EUR",
+      "amount": 100,
+      "result": 93.1,
+      "timestamp": "2025-10-28T10:00:00Z"
+    }
+  ]
+}
+```
