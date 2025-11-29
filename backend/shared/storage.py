@@ -168,7 +168,11 @@ def update_conversion_record(conversion_id: str, updates: Dict[str, Any]) -> boo
     """Actualiza una conversión existente."""
     table = _get_table()
     if table is None:
+        logger.warning("No se pudo obtener la tabla DynamoDB")
         return False
+
+    logger.info(f"Intentando actualizar conversión con ID: {conversion_id}")
+    logger.info(f"Updates: {updates}")
 
     # Primero verificar que la conversión existe
     try:
@@ -178,7 +182,9 @@ def update_conversion_record(conversion_id: str, updates: Dict[str, Any]) -> boo
                 SORT_KEY: conversion_id
             }
         )
+        logger.info(f"Respuesta de get_item: {response}")
         if "Item" not in response:
+            logger.warning(f"No se encontró item con ID: {conversion_id}")
             return False  # No existe la conversión
     except (BotoCoreError, ClientError) as exc:
         logger.warning("Error verificando la conversión existente: %s", exc)
@@ -187,32 +193,52 @@ def update_conversion_record(conversion_id: str, updates: Dict[str, Any]) -> boo
     # Construir la expresión de actualización
     update_expression = "SET "
     expression_attribute_values = {}
+    expression_attribute_names = {}
     expression_parts = []
 
     allowed_fields = ["from", "to", "amount", "result", "rate", "last_updated"]
+    reserved_words = {"result": "#result_value", "from": "#from_value"}  # DynamoDB reserved words
     
     for field, value in updates.items():
         if field in allowed_fields:
-            expression_parts.append(f"{field} = :{field}")
+            # Usar attribute name si es palabra reservada
+            field_name = reserved_words.get(field, field)
+            if field in reserved_words:
+                expression_attribute_names[field_name] = field
+                expression_parts.append(f"{field_name} = :{field}")
+            else:
+                expression_parts.append(f"{field} = :{field}")
+                
             if field in ["amount", "result", "rate"]:
                 expression_attribute_values[f":{field}"] = _to_decimal(value)
             else:
                 expression_attribute_values[f":{field}"] = value
 
     if not expression_parts:
+        logger.warning("No hay campos válidos para actualizar")
         return False  # No hay campos válidos para actualizar
 
     update_expression += ", ".join(expression_parts)
+    logger.info(f"Update expression: {update_expression}")
+    logger.info(f"Expression values: {expression_attribute_values}")
+    logger.info(f"Expression names: {expression_attribute_names}")
 
     try:
-        table.update_item(
-            Key={
+        update_params = {
+            "Key": {
                 PARTITION_KEY: "conversion#history",
                 SORT_KEY: conversion_id
             },
-            UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_attribute_values
-        )
+            "UpdateExpression": update_expression,
+            "ExpressionAttributeValues": expression_attribute_values
+        }
+        
+        # Solo agregar ExpressionAttributeNames si hay palabras reservadas
+        if expression_attribute_names:
+            update_params["ExpressionAttributeNames"] = expression_attribute_names
+            
+        table.update_item(**update_params)
+        logger.info("Update ejecutado exitosamente")
         return True
     except (BotoCoreError, ClientError) as exc:
         logger.warning("No fue posible actualizar la conversión: %s", exc)
