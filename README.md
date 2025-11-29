@@ -1,4 +1,4 @@
-# 💱 Serverless Currency Converter
+# 💱 Proyecto Final Corte 3
 
 Aplicación web basada en **arquitectura Serverless (FaaS)**, que permite:
 
