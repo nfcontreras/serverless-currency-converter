@@ -180,6 +180,8 @@ function renderHistory(data) {
       const result = numberFormatter.format(entry.result);
       const timestamp = formatTimestamp(entry.timestamp);
       const entryId = entry.timestamp || entry.id; // Use timestamp as ID
+      const escapedId = entryId.replace(/'/g, "&#39;");
+      const escapedEntry = JSON.stringify(entry).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
       return `
         <li class="history-item">
           <div class="history-item-content">
@@ -188,8 +190,8 @@ function renderHistory(data) {
               ${timestamp ? `<span>${timestamp}</span>` : ""}
             </div>
             <div class="history-item-actions">
-              <button class="edit-button" onclick="showEditModal('${entryId}', ${JSON.stringify(entry).replace(/"/g, '&quot;')})" title="Editar conversión">✏️</button>
-              <button class="delete-button" onclick="showDeleteConfirmation('${entryId}')" title="Eliminar conversión">🗑️</button>
+              <button class="edit-button" onclick="showEditModal('${escapedId}', ${escapedEntry})" title="Editar conversión">✏️</button>
+              <button class="delete-button" onclick="showDeleteConfirmation('${escapedId}')" title="Eliminar conversión">🗑️</button>
             </div>
           </div>
         </li>
@@ -308,7 +310,7 @@ async function handleDeleteHistoryItem(id) {
   });
 
   try {
-    await request(`/history/${encodeURIComponent(id)}`, {
+    await request(`/history/${id}`, {
       method: "DELETE"
     });
     
@@ -478,7 +480,7 @@ async function saveEdit(id) {
   }
   
   try {
-    const response = await request(`/history/${encodeURIComponent(id)}`, {
+    const response = await request(`/history/${id}`, {
       method: 'PUT',
       body: JSON.stringify(formData)
     });
