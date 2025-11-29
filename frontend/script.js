@@ -179,7 +179,7 @@ function renderHistory(data) {
       const amount = numberFormatter.format(entry.amount);
       const result = numberFormatter.format(entry.result);
       const timestamp = formatTimestamp(entry.timestamp);
-      const entryId = entry.timestamp || entry.id; // Use timestamp as ID
+      const entryId = entry.id || entry.timestamp; // Use id field primarily
       const escapedId = entryId.replace(/'/g, "&#39;");
       const escapedEntry = JSON.stringify(entry).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
       return `
@@ -310,7 +310,10 @@ async function handleDeleteHistoryItem(id) {
   });
 
   try {
-    await request(`/history/${id}`, {
+    console.log('Raw ID from entry:', id);
+    console.log('Encoded ID for URL:', encodeURIComponent(id));
+    console.log('Final URL will be:', `${BASE_URL}/history/${encodeURIComponent(id)}`);
+    await request(`/history/${encodeURIComponent(id)}`, {
       method: "DELETE"
     });
     
@@ -480,7 +483,9 @@ async function saveEdit(id) {
   }
   
   try {
-    const response = await request(`/history/${id}`, {
+    console.log('Updating with ID:', id);
+    console.log('Encoded ID for URL:', encodeURIComponent(id));
+    const response = await request(`/history/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(formData)
     });
