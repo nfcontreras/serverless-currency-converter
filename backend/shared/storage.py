@@ -45,7 +45,19 @@ def _get_table():
         return None
 
     try:
-        resource = boto3.resource("dynamodb")  # type: ignore[union-attr]
+        # Configuración para desarrollo local
+        import os
+        if os.environ.get('IS_OFFLINE') or os.environ.get('AWS_SAM_LOCAL'):
+            resource = boto3.resource(
+                "dynamodb",
+                endpoint_url="http://localhost:8000",
+                region_name="localhost",
+                aws_access_key_id="fake",
+                aws_secret_access_key="fake"
+            )
+        else:
+            resource = boto3.resource("dynamodb")  # type: ignore[union-attr]
+            
         table = resource.Table(TABLE_NAME)
         table.load()  # Ensures the table exists and we have permissions.
     except (BotoCoreError, ClientError) as exc:
@@ -102,6 +114,7 @@ def fetch_history(limit: int = 20) -> Tuple[List[Dict[str, Any]], bool]:
     items = response.get("Items", [])
     history = [
         {
+            "id": item.get(SORT_KEY),  # timestamp as unique ID
             "from": item.get("from"),
             "to": item.get("to"),
             "amount": _to_float(item.get("amount")),
@@ -114,6 +127,115 @@ def fetch_history(limit: int = 20) -> Tuple[List[Dict[str, Any]], bool]:
     ]
 
     return (history, True)
+
+
+def get_conversion_by_id(conversion_id: str) -> Tuple[Optional[Dict[str, Any]], bool]:
+    """Obtiene una conversión específica por su ID (timestamp)."""
+    table = _get_table()
+    if table is None or not storage_supported():
+        return (None, False)
+
+    try:
+        response = table.get_item(
+            Key={
+                PARTITION_KEY: "conversion#history",
+                SORT_KEY: conversion_id
+            }
+        )
+    except (BotoCoreError, ClientError) as exc:
+        logger.warning("No fue posible obtener la conversión: %s", exc)
+        return (None, False)
+
+    item = response.get("Item")
+    if not item:
+        return (None, True)  # No encontrado pero operación exitosa
+
+    conversion = {
+        "id": item.get(SORT_KEY),
+        "from": item.get("from"),
+        "to": item.get("to"),
+        "amount": _to_float(item.get("amount")),
+        "result": _to_float(item.get("result")),
+        "rate": _to_float(item.get("rate")),
+        "timestamp": item.get(SORT_KEY),
+        "last_updated": item.get("last_updated"),
+    }
+
+    return (conversion, True)
+
+
+def update_conversion_record(conversion_id: str, updates: Dict[str, Any]) -> bool:
+    """Actualiza una conversión existente."""
+    table = _get_table()
+    if table is None:
+        return False
+
+    # Primero verificar que la conversión existe
+    try:
+        response = table.get_item(
+            Key={
+                PARTITION_KEY: "conversion#history",
+                SORT_KEY: conversion_id
+            }
+        )
+        if "Item" not in response:
+            return False  # No existe la conversión
+    except (BotoCoreError, ClientError) as exc:
+        logger.warning("Error verificando la conversión existente: %s", exc)
+        return False
+
+    # Construir la expresión de actualización
+    update_expression = "SET "
+    expression_attribute_values = {}
+    expression_parts = []
+
+    allowed_fields = ["from", "to", "amount", "result", "rate", "last_updated"]
+    
+    for field, value in updates.items():
+        if field in allowed_fields:
+            expression_parts.append(f"{field} = :{field}")
+            if field in ["amount", "result", "rate"]:
+                expression_attribute_values[f":{field}"] = _to_decimal(value)
+            else:
+                expression_attribute_values[f":{field}"] = value
+
+    if not expression_parts:
+        return False  # No hay campos válidos para actualizar
+
+    update_expression += ", ".join(expression_parts)
+
+    try:
+        table.update_item(
+            Key={
+                PARTITION_KEY: "conversion#history",
+                SORT_KEY: conversion_id
+            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_attribute_values
+        )
+        return True
+    except (BotoCoreError, ClientError) as exc:
+        logger.warning("No fue posible actualizar la conversión: %s", exc)
+        return False
+
+
+def delete_conversion_record(conversion_id: str) -> bool:
+    """Elimina una conversión del historial."""
+    table = _get_table()
+    if table is None:
+        return False
+
+    try:
+        table.delete_item(
+            Key={
+                PARTITION_KEY: "conversion#history",
+                SORT_KEY: conversion_id
+            }
+        )
+        return True
+    except (BotoCoreError, ClientError) as exc:
+        logger.warning("No fue posible eliminar la conversión: %s", exc)
+        return False
 
 
 def _to_decimal(value: Any) -> Optional[Decimal]:
