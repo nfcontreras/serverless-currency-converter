@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
+from urllib.parse import unquote_plus
 
 from shared.storage import (
     fetch_history, 
@@ -35,6 +36,20 @@ FALLBACK_HISTORY = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_conversion_id(raw_id):
+    """Decodifica el ID de conversión desde URL path parameter"""
+    if not raw_id:
+        return None
+    
+    # Decodificar URL encoding
+    decoded_id = unquote_plus(raw_id)
+    
+    # Log para debugging
+    logger.info(f"Raw ID: {raw_id}, Decoded ID: {decoded_id}")
+    
+    return decoded_id
 
 
 def _success_response(body):
@@ -130,10 +145,13 @@ def get_conversion_by_id_handler(event, context):
     try:
         # Obtener el ID del path
         path_params = event.get("pathParameters") or {}
-        conversion_id = path_params.get("id")
+        raw_id = path_params.get("id")
         
-        if not conversion_id:
+        if not raw_id:
             return _error_response(400, "Conversion ID is required")
+        
+        conversion_id = _decode_conversion_id(raw_id)
+        logger.info(f"Looking for conversion with ID: {conversion_id}")
 
         conversion, storage_active = get_conversion_by_id(conversion_id)
         
@@ -171,10 +189,13 @@ def update_conversion(event, context):
     try:
         # Obtener el ID del path
         path_params = event.get("pathParameters") or {}
-        conversion_id = path_params.get("id")
+        raw_id = path_params.get("id")
         
-        if not conversion_id:
+        if not raw_id:
             return _error_response(400, "Conversion ID is required")
+        
+        conversion_id = _decode_conversion_id(raw_id)
+        logger.info(f"Updating conversion with ID: {conversion_id}")
 
         # Validar que hay un body
         if not event.get("body"):
@@ -212,10 +233,13 @@ def delete_conversion(event, context):
     try:
         # Obtener el ID del path
         path_params = event.get("pathParameters") or {}
-        conversion_id = path_params.get("id")
+        raw_id = path_params.get("id")
         
-        if not conversion_id:
+        if not raw_id:
             return _error_response(400, "Conversion ID is required")
+        
+        conversion_id = _decode_conversion_id(raw_id)
+        logger.info(f"Deleting conversion with ID: {conversion_id}")
 
         # Intentar eliminar
         success = delete_conversion_record(conversion_id)
