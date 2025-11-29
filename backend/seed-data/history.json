@@ -1,0 +1,42 @@
+[
+  {
+    "pk": "conversion#history",
+    "sk": "2025-11-28T10:00:00Z",
+    "from": "USD",
+    "to": "EUR", 
+    "amount": 100,
+    "result": 89.45,
+    "rate": 0.8945,
+    "last_updated": "2025-11-28T09:00:00Z"
+  },
+  {
+    "pk": "conversion#history",
+    "sk": "2025-11-28T14:30:00Z",
+    "from": "EUR",
+    "to": "COP",
+    "amount": 50,
+    "result": 215000,
+    "rate": 4300.00,
+    "last_updated": "2025-11-28T14:00:00Z"
+  },
+  {
+    "pk": "conversion#history", 
+    "sk": "2025-11-28T16:15:00Z",
+    "from": "GBP",
+    "to": "USD",
+    "amount": 75,
+    "result": 94.88,
+    "rate": 1.2651,
+    "last_updated": "2025-11-28T16:00:00Z"
+  },
+  {
+    "pk": "conversion#history",
+    "sk": "2025-11-29T08:20:00Z", 
+    "from": "USD",
+    "to": "JPY",
+    "amount": 200,
+    "result": 29800,
+    "rate": 149.00,
+    "last_updated": "2025-11-29T08:00:00Z"
+  }
+]

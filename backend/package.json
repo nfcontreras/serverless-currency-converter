@@ -1,0 +1,31 @@
+{
+  "name": "serverless-currency-converter-backend",
+  "version": "1.0.0",
+  "description": "Backend para convertidor de monedas con historial CRUD",
+  "scripts": {
+    "install-deps": "pip install -r requirements.txt",
+    "dev": "serverless offline start --host 0.0.0.0 --port 3000",
+    "dev-with-db": "serverless offline start --host 0.0.0.0 --port 3000",
+    "deploy": "serverless deploy",
+    "remove": "serverless remove",
+    "test": "python test_history_crud.py",
+    "logs": "serverless logs -f"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-offline": "^13.3.0",
+    "serverless-python-requirements": "^6.0.0",
+    "serverless-dynamodb": "^0.2.47"
+  },
+  "dependencies": {},
+  "keywords": [
+    "serverless",
+    "currency",
+    "converter",
+    "python",
+    "aws",
+    "lambda"
+  ],
+  "author": "nfcontreras",
+  "license": "MIT"
+}
