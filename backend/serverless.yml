@@ -15,6 +15,9 @@ provider:
             - dynamodb:DescribeTable
             - dynamodb:PutItem
             - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
           Resource:
             - arn:aws:dynamodb:${self:provider.region}:*:table/aws-currency-converter-history
 
@@ -35,6 +38,7 @@ functions:
           method: get
           cors: true
 
+  # CRUD para historial de conversiones
   getHistory:
     handler: get_history/handler.get_history
     events:
@@ -43,12 +47,76 @@ functions:
           method: get
           cors: true
 
+  createConversion:
+    handler: get_history/handler.create_conversion
+    events:
+      - http:
+          path: history
+          method: post
+          cors: true
+
+  getConversionById:
+    handler: get_history/handler.get_conversion_by_id_handler
+    events:
+      - http:
+          path: history/{id}
+          method: get
+          cors: true
+
+  updateConversion:
+    handler: get_history/handler.update_conversion
+    events:
+      - http:
+          path: history/{id}
+          method: put
+          cors: true
+
+  deleteConversion:
+    handler: get_history/handler.delete_conversion
+    events:
+      - http:
+          path: history/{id}
+          method: delete
+          cors: true
+
 plugins:
   - serverless-python-requirements
+  - serverless-offline
+  - serverless-dynamodb
 
 custom:
   pythonRequirements:
     dockerizePip: false
+    slim: true
+    strip: false
+  
+  # Configuración para desarrollo local
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+    corsAllowOrigin: "*"
+    corsAllowHeaders: "accept,content-type,x-api-key,authorization"
+    corsAllowCredentials: true
+    noAuth: true
+    printOutput: true
+  
+  # DynamoDB local para desarrollo
+  dynamodb:
+    stages:
+      - dev
+      - local
+    start:
+      port: 8000
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      migrate: true
+      seed: true
+    seed:
+      domain:
+        sources:
+          - table: aws-currency-converter-history
+            sources: [./seed-data/history.json]
 
 resources:
   Resources:
