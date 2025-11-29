@@ -197,7 +197,7 @@ def update_conversion_record(conversion_id: str, updates: Dict[str, Any]) -> boo
     expression_parts = []
 
     allowed_fields = ["from", "to", "amount", "result", "rate", "last_updated"]
-    reserved_words = {"result": "#result_value", "from": "#from_value"}  # DynamoDB reserved words
+    reserved_words = {"result": "#result_value", "from": "#from_value", "to": "#to_value"}  # DynamoDB reserved words
     
     for field, value in updates.items():
         if field in allowed_fields:
